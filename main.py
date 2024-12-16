@@ -6,8 +6,8 @@ from torchvision import datasets, transforms
 from sklearn.metrics import accuracy_score, confusion_matrix
 from torchviz import make_dot
 import model
-import torch.utils.benchmark as benchmark
 import time
+import argparse
 
 # 데이터 변환
 transform = transforms.Compose([
@@ -22,36 +22,28 @@ test_dataset = datasets.MNIST(root='./data', train=False, download=True, transfo
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
-model_instance = model.Model()
-# 모델 시각화
-dummy_input = torch.randn(1, 1, 28, 28)
-output = model_instance(dummy_input)
-dot = make_dot(output, params=dict(model_instance.named_parameters()))
-dot.render("model_structure", format="png")
+def train(model_instance, train_loader, criterion, optimizer, epochs=10):
+    for epoch in range(epochs):
+        model_instance.train()
+        for inputs, labels in train_loader:
+            optimizer.zero_grad()
+            outputs = model_instance(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+        print(f'Epoch {epoch+1} 완료')
+    # 모델 저장
+    torch.save(model_instance.state_dict(), 'model.pth')
+    print('모델 저장 완료')
 
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model_instance.parameters(), lr=0.001)
-
-# 학습 루프
-for epoch in range(10):
-    model_instance.train()
-    for inputs, labels in train_loader:
-        optimizer.zero_grad()
-        outputs = model_instance(inputs)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
-    print(f'Epoch {epoch+1} 완료')
-
-# 평가 함수
-def evaluate(model, dataloader):
-    model.eval()
+def evaluate(model_instance, dataloader):
+    model_instance.eval()
     all_preds, all_labels = [], []
     inference_times = []
     with torch.no_grad():
         for inputs, labels in dataloader:
             start_time = time.time()
-            outputs = model(inputs)
+            outputs = model_instance(inputs)
             end_time = time.time()
             inference_times.append(end_time - start_time)
             
@@ -67,5 +59,26 @@ def evaluate(model, dataloader):
     print('Confusion Matrix:')
     print(cm)
 
-# 테스트
-evaluate(model_instance, test_loader)
+def main():
+    parser = argparse.ArgumentParser(description='Train or Evaluate the Model')
+    parser.add_argument('--mode', type=str, choices=['train', 'evaluate'], required=True, help='Mode: train or evaluate')
+    args = parser.parse_args()
+
+    model_instance = model.Model()
+
+    if args.mode == 'train':
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.Adam(model_instance.parameters(), lr=0.001)
+        train(model_instance, train_loader, criterion, optimizer)
+    elif args.mode == 'evaluate':
+        # 모델 로드
+        model_instance.load_state_dict(torch.load('model.pth'))
+        # 모델 시각화 (옵션)
+        dummy_input = torch.randn(1, 1, 28, 28)
+        output = model_instance(dummy_input)
+        dot = make_dot(output, params=dict(model_instance.named_parameters()))
+        dot.render("model_structure", format="png")
+        evaluate(model_instance, test_loader)
+
+if __name__ == '__main__':
+    main()
