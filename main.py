@@ -6,6 +6,8 @@ from torchvision import datasets, transforms
 from sklearn.metrics import accuracy_score, confusion_matrix
 from torchviz import make_dot
 import model
+import torch.utils.benchmark as benchmark
+import time
 
 # 데이터 변환
 transform = transforms.Compose([
@@ -45,12 +47,20 @@ for epoch in range(10):
 def evaluate(model, dataloader):
     model.eval()
     all_preds, all_labels = [], []
+    inference_times = []
     with torch.no_grad():
         for inputs, labels in dataloader:
+            start_time = time.time()
             outputs = model(inputs)
+            end_time = time.time()
+            inference_times.append(end_time - start_time)
+            
             _, preds = torch.max(outputs, 1)
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
+    average_inference_time = sum(inference_times) / len(inference_times)
+    print(f'Average Inference Time per Batch: {average_inference_time:.6f} seconds')
+    
     accuracy = accuracy_score(all_labels, all_preds)
     cm = confusion_matrix(all_labels, all_preds)
     print(f'Accuracy: {accuracy}')
