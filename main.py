@@ -9,6 +9,10 @@ import model
 import time
 import argparse
 
+# main.py 시작 부분에 device 설정 추가
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f'Using device: {device}')
+
 # 데이터 변환
 transform = transforms.Compose([
     transforms.ToTensor(),
@@ -23,9 +27,11 @@ train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
 def train(model_instance, train_loader, criterion, optimizer, epochs=10):
+    model_instance.to(device)#using device
     for epoch in range(epochs):
         model_instance.train()
         for inputs, labels in train_loader:
+            inputs, labels = inputs.to(device), labels.to(device)#move to device
             optimizer.zero_grad()
             outputs = model_instance(inputs)
             loss = criterion(outputs, labels)
@@ -37,11 +43,13 @@ def train(model_instance, train_loader, criterion, optimizer, epochs=10):
     print('모델 저장 완료')
 
 def evaluate(model_instance, dataloader):
+    model_instance.to(device)#using device
     model_instance.eval()
     all_preds, all_labels = [], []
     inference_times = []
     with torch.no_grad():
         for inputs, labels in dataloader:
+            inputs=inputs.to(device)#move to device
             start_time = time.time()
             outputs = model_instance(inputs)
             end_time = time.time()
